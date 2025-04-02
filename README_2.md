@@ -1,7 +1,7 @@
-###You should have Python 3.7 to make this project work.
+### You should have Python 3.7 to make this project work.
 
 
-###Next you need to these commands as they solve dependancies errors :
+### Next you need to these commands as they solve dependancies errors :
 
 pip install torch==1.3.0+cpu -f https://download.pytorch.org/whl/torch_stable.html 
 
