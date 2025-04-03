@@ -23,7 +23,7 @@ from models import Sublign
 
 sys.path.append('../data')
 
-from data_utils import parse_data
+from data.data_utils import parse_data
 from load import load_data_format, chf
 
 sys.path.append('../evaluation')
@@ -172,7 +172,8 @@ def main():
 
     #     import pdb; pdb.set_trace()
         pear  = pearsonr(eps_lst, est_eps)[0]
-        swaps = swap_metrics(eps_lst, est_eps)
+        swaps = 
+        (eps_lst, est_eps)
         per_pos = np.mean(np.array(test_p_deltas - test_deltas) > 0)
 
         trial_results[trial] = (pear, swaps, per_pos)

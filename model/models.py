@@ -7,7 +7,7 @@ import torch.nn.functional as F
 # torch.manual_seed(0)
 # torch.backends.cudnn.deterministic = True
 # torch.backends.cudnn.benchmark = False
-
+import os
 
 from pyro.distributions import MultivariateNormal, Normal, Independent
 
@@ -23,10 +23,10 @@ sys.path.append('/home/REDACTED/chf-github/model/')
 from utils import check_has_missing, quad_function, convert_XY_pack_pad
 
 sys.path.append('../evaluation/')
-from eval_utils import get_cluster_swap_metric, get_cluster_pear_metric
+#from eval_utils import get_cluster_swap_metric, get_cluster_pear_metric
 
 sys.path.append('../plot/')
-from plot_utils import plot_latent_labels, plot_delta_comp
+from plot.plot_utils import plot_latent_labels, plot_delta_comp
 
 
 import matplotlib.pylab as pylab
@@ -84,8 +84,8 @@ class Model(nn.Module):
         
         test_ari_vals  = list()
         test_mse_vals  = list()
-        test_pear_vals = list()
-        test_swaps_vals = list()
+        #test_pear_vals = list()
+        #test_swaps_vals = list()
         
         
         train_nelbo = list()
@@ -240,13 +240,13 @@ class Model(nn.Module):
                     test_mse   = self.get_mse(test_X, test_Y, test_M, test_theta, best_delta)
                     test_ari   = adjusted_rand_score(test_clusters, true_clusters)
 
-                    test_swaps = get_cluster_swap_metric(test_clusters, test_T[:,0,0].detach().numpy(), best_delta.detach().numpy())
-                    test_pear  = get_cluster_pear_metric(test_clusters, test_T[:,0,0].detach().numpy(), best_delta.detach().numpy())
+                    #test_swaps = get_cluster_swap_metric(test_clusters, test_T[:,0,0].detach().numpy(), best_delta.detach().numpy())
+                    #test_pear  = get_cluster_pear_metric(test_clusters, test_T[:,0,0].detach().numpy(), best_delta.detach().numpy())
 
                     test_ari_vals.append(test_ari)
                     test_mse_vals.append(test_mse)
-                    test_swaps_vals.append(test_swaps)
-                    test_pear_vals.append(test_pear)
+                    #test_swaps_vals.append(test_swaps)
+                    #test_pear_vals.append(test_pear)
 
                     test_batch_loss += eval_loss.item()
                     test_idx += 1
@@ -294,12 +294,15 @@ class Model(nn.Module):
         self.best_nll      = best_nll
         self.best_kl       = best_kl
         self.best_ep       = best_ep
-        
-        if fname is not None and epochs > eval_freq:
+        """
+        if fname is not None and epochs > eval_freq :
+            print('Loaded existing model from:', fname)
             print('loaded state_dict. nelbo: %.4f (ep %d)' % (best_nelbo, best_ep))
             self.load_state_dict(torch.load(fname))
             self.eval()
-
+        else:
+            print('No saved model found at fname, starting fresh training.')    
+        """
         self.training_loss = training_loss
         self.testing_loss  = testing_loss
         
@@ -338,8 +341,8 @@ class Model(nn.Module):
                        'eval_freq': eval_freq, 
                        'ari': test_ari_vals,
                        'mse': test_mse_vals,
-                       'swaps': test_swaps_vals,
-                       'pear': test_pear_vals,
+                       #'swaps': test_swaps_vals,
+                       #'pear': test_pear_vals,
                        'train_likelihood': train_likelihood,
                        'test_likelihood': test_likelihood,
                        'train_loss': training_loss,
@@ -631,7 +634,7 @@ class Sublign(Model):
         
         return (norm_nelbo, norm_nll, norm_kl), norm_reg
     
-    def sample(self, X,Y,mu_std=False,XY=None,all_seq_lengths=None, has_missing=False):
+    def sample(self, X,Y,mu_std=False,XY=None,all_seq_lengths=None, has_missing=False,idx=None):
         """
         Returns z and KL sampled from observed X,Y
         """
@@ -663,9 +666,10 @@ class Sublign(Model):
         # mu_param is a pytorch tensor (randomly initialized) of size N x dimensionality of latent space
         # gamma = 1 (learning w/ inf. network) or 0. (learning w/ svi) 
         
-        mu_table = mu_param[idx]
+        #mu_table = mu_param[idx]
         mu_enc     = self.enc_h_mu(hid)
-        mu = gamma*mu_enc+(1-gamma)*mu_table
+        mu = mu_enc
+
 
         sig    = torch.exp(self.enc_h_sig(hid))
         q_dist = Independent(Normal(mu, sig), 1)
@@ -682,6 +686,7 @@ class Sublign(Model):
             return z, kl, mu
         else:
             return z, kl
+        
     
     def get_mu(self, X,Y):
         N = X.shape[0]
@@ -693,12 +698,23 @@ class Sublign(Model):
         if check_has_missing(XY):
             batch_in, sequences = convert_XY_pack_pad(XY)
             pack = torch.nn.utils.rnn.pack_padded_sequence(batch_in, sequences, batch_first=True, enforce_sorted=False)
+            print("Max sequence length:", batch_in.shape[1])
+            print("All-zero sequences:", torch.sum(batch_in == 0, dim=(1, 2)) == batch_in.shape[1] * batch_in.shape[2])
+            print("Sequence lengths:", sequences)
             _, hidden = self.rnn(pack)
+            import pdb; pdb.set_trace()
         else:
             _, hidden = self.rnn(XY)
-            
+        #print("Checking X:", torch.isnan(X).sum().item(), "NaNs")
+        #print("Checking Y:", torch.isnan(Y).sum().item(), "NaNs")
+        
         hid = torch.squeeze(hidden)
+        #print("NaNs in hidden:", torch.isnan(hidden).sum().item())
+        #print("🔍 NaNs in hid:", torch.isnan(hid).sum().item())
         mu     = self.enc_h_mu(hid)
+        #print("mu shape:", mu.shape)
+        #"print("🔍 NaNs in mu:", torch.isnan(mu).sum().item())
+
         return mu, torch.zeros(N)
     
     def infer_functional_params(self, z):
@@ -718,9 +734,12 @@ class Sublign(Model):
             z      = z.cpu().detach().numpy()
         else:
             z      = z.detach().numpy()
-        
         # for different cluster algs, plot labels and true subtypes
         km = KMeans(n_clusters=K)
+        #print("🔍 NaNs found in z")
+        #print("z shape:", z.shape)
+        #print("z NaNs count:", np.isnan(z).sum())
+        #print("Example values:", z[:5])
         if np.isnan(z).any():
             print('z has nan in it')
             import pdb; pdb.set_trace()
@@ -758,7 +777,6 @@ class Sublign(Model):
         step 3: return theta_k = g1(z_k) for K clusters
         """
         params = self.get_params(X,Y)
-        pdb
         z      = z.detach().numpy()
         
         # for different cluster algs, plot labels and true subtypes
@@ -856,14 +874,14 @@ class Sublign(Model):
         test_mse   = self.get_mse(test_X, test_Y, test_M, test_theta, best_delta)
         test_ari   = adjusted_rand_score(test_clusters, true_clusters)
 
-        test_swaps = get_cluster_swap_metric(test_clusters, test_data_dict['t_collect'][:,0,0], best_delta.detach().numpy())
-        test_pear  = get_cluster_pear_metric(test_clusters, test_data_dict['t_collect'][:,0,0], best_delta.detach().numpy())
+        #test_swaps = get_cluster_swap_metric(test_clusters, test_data_dict['t_collect'][:,0,0], best_delta.detach().numpy())
+        #test_pear  = get_cluster_pear_metric(test_clusters, test_data_dict['t_collect'][:,0,0], best_delta.detach().numpy())
         
         results = {
             'mse': test_mse,
             'ari': test_ari,
-            'swaps': test_swaps,
-            'pear': test_pear,
+            #'swaps': test_swaps,
+            #'pear': test_pear,
             'cent_lst': cent_lst
         }
         
@@ -955,9 +973,9 @@ def main():
     import sys
     sys.path.append('../data')
     sys.path.append('../plot')
-    from load import sigmoid, quadratic, chf, parkinsons, load_data_format
-    from data_utils import parse_data, change_missing
-    from plot_utils import plot_subtypes, plot_latent
+    from data.load import sigmoid, quadratic, chf, parkinsons, load_data_format
+    from data.data_utils import parse_data, change_missing
+    from plot.plot_utils import plot_subtypes, plot_latent
     
     parser = argparse.ArgumentParser() 
     parser.add_argument('--epochs', action='store', type=int, default=800, help="Number of epochs")
