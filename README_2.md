@@ -1,6 +1,7 @@
 ### You should have Python 3.7 to make this project work.
 ### Next activate a virtual environment
 python 3.7 -m venv venv
+
 venv/Scripts/activate
 
 
@@ -34,7 +35,9 @@ pip uninstall pandas
 pip install pandas
 
 ### Next you need to execute My_experiment.py :
+
 cd model
+
 python My_experiment.py
 
 
