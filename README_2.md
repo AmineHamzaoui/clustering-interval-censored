@@ -1,6 +1,11 @@
 ### You should have Python 3.7 to make this project work.
+### Next activate a virtual environment
+python 3.7 -m venv venv
+
+venv/Scripts/activate
 
 
+pip install -r requirements.txt
 ### Next you need to these commands as they solve dependancies errors :
 
 pip install torch==1.3.0+cpu -f https://download.pytorch.org/whl/torch_stable.html 
@@ -28,3 +33,11 @@ pip install --upgrade scipy
 pip uninstall pandas
 
 pip install pandas
+
+### Next you need to execute My_experiment.py :
+
+cd model
+
+python My_experiment.py
+
+
