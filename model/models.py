@@ -650,13 +650,16 @@ class Sublign(Model):
         if has_missing:
 #             batch_in, sequences = convert_XY_pack_pad(XY,how=self.how_missing)
             pack = torch.nn.utils.rnn.pack_padded_sequence(cacheXY, all_seq_lengths, batch_first=True, enforce_sorted=False)
+            
             _, hidden = self.rnn(pack)
         elif check_has_missing(XY):
             batch_in, sequences = convert_XY_pack_pad(XY,how=self.how_missing)
             pack = torch.nn.utils.rnn.pack_padded_sequence(cacheXY, all_seq_lengths, batch_first=True, enforce_sorted=False)
             _, hidden = self.rnn(pack)
         else:
+        
             _, hidden = self.rnn(XY)
+            print('output off RNN',hidden)
         
         self.debug['rnn'] = hidden
         
@@ -712,8 +715,10 @@ class Sublign(Model):
         #print("NaNs in hidden:", torch.isnan(hidden).sum().item())
         #print("🔍 NaNs in hid:", torch.isnan(hid).sum().item())
         mu     = self.enc_h_mu(hid)
+        #import pdb; pdb.set_trace()
+
         #print("mu shape:", mu.shape)
-        #"print("🔍 NaNs in mu:", torch.isnan(mu).sum().item())
+        #print("🔍 NaNs in mu:", torch.isnan(mu).sum().item())
 
         return mu, torch.zeros(N)
     
@@ -729,6 +734,9 @@ class Sublign(Model):
         step 2: K-means cluster these z and save centers
         step 3: return theta_k = g1(z_k) for K clusters
         """
+        print("➡️ get_subtypes received X shape:", X.shape)
+        print("➡️ Min/max in X:", np.nanmin(X), np.nanmax(X))
+        print("➡️ Any NaNs in X:", np.isnan(X).sum())
         z, _   = self.get_mu(X,Y)
         if z.get_device() > -1:
             z      = z.cpu().detach().numpy()
